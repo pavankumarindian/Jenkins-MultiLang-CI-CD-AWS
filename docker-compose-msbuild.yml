@@ -1,0 +1,6 @@
+version: '3'
+services:
+  msbuild-app:
+    image: your-docker-image-name-msbuild
+    ports:
+      - "80:80"

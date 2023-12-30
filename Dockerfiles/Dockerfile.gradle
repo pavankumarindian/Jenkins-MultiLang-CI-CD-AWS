@@ -1,0 +1,8 @@
+FROM gradle:7.3.3-jdk11
+
+COPY . /app
+WORKDIR /app
+
+RUN gradle build
+
+CMD ["java", "-cp", "build/classes/java/main", "com.example.App"]
