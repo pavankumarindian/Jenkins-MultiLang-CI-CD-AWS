@@ -1,87 +1,95 @@
 pipeline {
-    agent any
+    agent {
+        label 'ubuntu-agent'
+    }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout from GitHub') {
             steps {
-                checkout scm
+                script {
+                    // Assuming your GitHub credentials are configured in Jenkins
+                    checkout([$class: 'GitSCM', branches: [[name: '*/main']], userRemoteConfigs: [[url: 'https://github.com/your-username/my-java-web-app.git']]])
+                    checkout([$class: 'GitSCM', branches: [[name: '*/main']], userRemoteConfigs: [[url: 'https://github.com/your-username/my-java-web-app-gradle.git']]])
+                    checkout([$class: 'GitSCM', branches: [[name: '*/main']], userRemoteConfigs: [[url: 'https://github.com/your-username/my-python-web-app.git']]])
+                    checkout([$class: 'GitSCM', branches: [[name: '*/main']], userRemoteConfigs: [[url: 'https://github.com/your-username/my-dotnet-web-app.git']]])
+                }
             }
         }
 
-        stage('Build and Test Maven') {
+        stage('Install Maven') {
             steps {
-                dir('maven-project') {
+                script {
+                    sh 'sudo apt-get update && sudo apt-get install -y maven'
+                }
+            }
+        }
+
+        stage('Build and Deploy Java App with Maven') {
+            steps {
+                script {
                     sh 'mvn clean install'
+                    sh 'docker build -t my-java-web-app:latest -f Dockerfile-java .'
+                    sh 'scp -o StrictHostKeyChecking=no -i /path/to/key.pem target/app.jar ubuntu@<java-ec2-instance-ip>:/path/to/destination'
+                    sh 'ssh -o StrictHostKeyChecking=no -i /path/to/key.pem ubuntu@<java-ec2-instance-ip> "docker run -d -p 8080:8080 my-java-web-app:latest"'
                 }
             }
         }
 
-        stage('Build Docker Image - Maven') {
+        stage('Install Gradle') {
             steps {
                 script {
-                    def imageName = 'your-docker-image-name-maven'
-                    docker.build(imageName, '-f Dockerfiles/Dockerfile.maven .')
+                    sh 'sudo apt-get install -y gradle'
                 }
             }
         }
 
-        stage('Docker Compose - Maven') {
+        stage('Build and Deploy Java App with Gradle') {
             steps {
                 script {
-                    sh 'docker-compose -f docker-compose-maven.yml up -d'
+                    sh 'gradle build'
+                    sh 'docker build -t my-java-web-app-gradle:latest -f Dockerfile-gradle .'
+                    sh 'scp -o StrictHostKeyChecking=no -i /path/to/key.pem build/libs/app.jar ubuntu@<gradle-ec2-instance-ip>:/path/to/destination'
+                    sh 'ssh -o StrictHostKeyChecking=no -i /path/to/key.pem ubuntu@<gradle-ec2-instance-ip> "docker run -d -p 8081:8080 my-java-web-app-gradle:latest"'
                 }
             }
         }
 
-        // Similar stages for Gradle, Python, and MS Build
-
-        stage('Build Docker Image - Gradle') {
+        stage('Install Python Build Tool') {
             steps {
                 script {
-                    def imageName = 'your-docker-image-name-gradle'
-                    docker.build(imageName, '-f Dockerfiles/Dockerfile.gradle .')
+                    sh 'sudo apt-get install -y python3 python3-pip'
+                    sh 'pip3 install -r requirements.txt'
                 }
             }
         }
 
-        stage('Docker Compose - Gradle') {
+        stage('Build and Deploy Python App') {
             steps {
                 script {
-                    sh 'docker-compose -f docker-compose-gradle.yml up -d'
+                    sh 'echo "print(\'Hello, Python!\')" > app.py'
+                    sh 'docker build -t my-python-web-app:latest -f Dockerfile-python .'
+                    sh 'scp -o StrictHostKeyChecking=no -i /path/to/key.pem target/app.py ubuntu@<python-ec2-instance-ip>:/path/to/destination'
+                    sh 'ssh -o StrictHostKeyChecking=no -i /path/to/key.pem ubuntu@<python-ec2-instance-ip> "docker run -d -p 5000:5000 my-python-web-app:latest"'
                 }
             }
         }
 
-        stage('Build Docker Image - Python') {
+        stage('Install .NET Build Tool') {
             steps {
                 script {
-                    def imageName = 'your-docker-image-name-python'
-                    docker.build(imageName, '-f Dockerfiles/Dockerfile.python .')
+                    sh 'sudo apt-get update && sudo apt-get install -y dotnet-sdk-3.1'
                 }
             }
         }
 
-        stage('Docker Compose - Python') {
+        stage('Build and Deploy .NET App') {
             steps {
                 script {
-                    sh 'docker-compose -f docker-compose-python.yml up -d'
-                }
-            }
-        }
-
-        stage('Build Docker Image - MS Build') {
-            steps {
-                script {
-                    def imageName = 'your-docker-image-name-msbuild'
-                    docker.build(imageName, '-f Dockerfiles/Dockerfile.msbuild .')
-                }
-            }
-        }
-
-        stage('Docker Compose - MS Build') {
-            steps {
-                script {
-                    sh 'docker-compose -f docker-compose-msbuild.yml up -d'
+                    sh 'echo "Console.WriteLine(\'Hello, .NET!\')" > Program.cs'
+                    sh 'dotnet build'
+                    sh 'docker build -t my-dotnet-web-app:latest -f Dockerfile-dotnet .'
+                    sh 'scp -o StrictHostKeyChecking=no -i /path/to/key.pem bin/Debug/netcoreapp3.1/app.dll ubuntu@<dotnet-ec2-instance-ip>:/path/to/destination'
+                    sh 'ssh -o StrictHostKeyChecking=no -i /path/to/key.pem ubuntu@<dotnet-ec2-instance-ip> "docker run -d -p 8082:80 my-dotnet-web-app:latest"'
                 }
             }
         }
